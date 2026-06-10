@@ -286,7 +286,7 @@ const firebaseConfig = {
   measurementId: "G-C2FL6Z7W2Z"
 };
 
-const fbApp  = initializeApp(FIREBASE_CONFIG);
+const fbApp  = initializeApp(firebaseConfig);
 const auth   = getAuth(fbApp);
 const db     = getDatabase(fbApp);
 const googleProvider = new GoogleAuthProvider();

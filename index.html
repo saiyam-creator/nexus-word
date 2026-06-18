@@ -412,6 +412,31 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;font-family:'
 #top-right-buttons.hide-buttons {
   display: none;
 }
+/* ═══ ROOM SELECTION REDESIGN ═══ */
+.room-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;padding:4px 2px}
+.room-card-v2{border-radius:14px;padding:0;overflow:hidden;cursor:pointer;transition:all .3s;position:relative;border:1px solid rgba(255,255,255,.08)}
+.room-card-v2:hover{transform:translateY(-3px);box-shadow:0 8px 30px rgba(0,0,0,.5)}
+.room-card-v2.selected-v2{transform:translateY(-3px)}
+.rc2-banner{height:80px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.rc2-banner-grid{position:absolute;inset:0;opacity:.15}
+.rc2-theme-icon{font-size:28px;position:relative;z-index:2;filter:drop-shadow(0 0 12px currentColor)}
+.rc2-body{padding:10px 12px;background:rgba(0,0,0,.75);backdrop-filter:blur(10px)}
+.rc2-name{font-size:11px;letter-spacing:2px;font-weight:bold;margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rc2-meta-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.rc2-online{display:flex;align-items:center;gap:4px;font-size:9px;letter-spacing:1px}
+.rc2-dot{width:5px;height:5px;border-radius:50%;animation:dotPulse 2s infinite}
+.rc2-badges{display:flex;gap:4px}
+.rc2-badge{padding:1px 6px;border-radius:8px;font-size:7px;letter-spacing:1px}
+.rc2-owner-badge{position:absolute;top:6px;right:6px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.2);color:#aaa;padding:2px 6px;border-radius:8px;font-size:7px;letter-spacing:1px}
+.rc2-delete{position:absolute;top:6px;left:6px;background:rgba(255,60,60,.2);border:1px solid #ff4444;color:#ff6b6b;width:20px;height:20px;border-radius:5px;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .2s}
+.room-card-v2:hover .rc2-delete{opacity:1}
+.rc2-full-bar{position:absolute;bottom:0;left:0;right:0;background:rgba(255,60,60,.15);border-top:1px solid rgba(255,60,60,.3);color:#ff6b6b;font-size:8px;letter-spacing:2px;text-align:center;padding:3px}
+.room-section-v2{margin-bottom:16px}
+.rsv2-label{font-size:9px;letter-spacing:4px;text-transform:uppercase;padding:0 2px 8px;display:flex;align-items:center;gap:8px}
+.rsv2-label::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.06)}
+.room-search{width:100%;background:rgba(0,0,0,.5);border:1px solid rgba(0,245,255,.15);border-radius:8px;color:#00f5ff;padding:8px 12px;font-size:11px;font-family:'Courier New',monospace;outline:none;margin-bottom:12px;letter-spacing:1px}
+.room-search::placeholder{color:#223}
+.room-search:focus{border-color:rgba(0,245,255,.4)}
 </style>
 </head>
 <body>
@@ -508,6 +533,17 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;font-family:'
               <input id="new-room-code" placeholder="secret key" maxlength="20">
             </div>
           </div>
+          <div class="p-row">
+            <label>Room Theme</label>
+            <select id="new-room-theme">
+              <option value="cyberpunk">🌆 CYBERPUNK</option>
+              <option value="void">🌌 VOID</option>
+              <option value="inferno">🔥 INFERNO</option>
+              <option value="deepsea">🌊 DEEP SEA</option>
+              <option value="matrix">🌿 MATRIX</option>
+              <option value="neon">⚡ NEON STORM</option>
+            </select>
+          </div>
           <div class="key-note" id="key-note">Public rooms are visible to everyone.</div>
           <div class="room-btns">
             <button onclick="createRoom()">+ CREATE ROOM</button>
@@ -565,7 +601,7 @@ html,body{width:100vw;height:100vh;overflow:hidden;background:#000;font-family:'
       <button class="host-badge" id="host-badge" style="display:none" onclick="openHostModal()">👑 HOST</button>
       <div class="tb-time" id="tb-time"></div>
       <button class="signout-btn" onclick="doSignOut()">EXIT</button>
-      <button onclick="console.log('ROOM:',selectedRoomId,'ROOMDATA:',roomsById[selectedRoomId],'HOST:',isHostNow(),'UID:',auth?.currentUser?.uid)" style="background:transparent;border:1px solid #ff00ff33;color:#ff00ff;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:8px;font-family:'Courier New',monospace">DBG</button>
+      <!-- <button id="dbg-btn" style="background:transparent;border:1px solid #ff00ff33;color:#ff00ff;padding:3px 8px;border-radius:5px;cursor:pointer;font-size:8px;font-family:'Courier New',monospace">DBG</button> -->
     </div>
   </div>
 
@@ -850,10 +886,10 @@ window.registerEmail = async () => {
 // ✅ FIX: EXIT → PROFILE PAGE (not full reload)
 window.doSignOut = async () => {
   stopMusic();
+  _isExiting = true; // pushPos band karo turant
+  if(myUID) _leavingUIDs.add(myUID); // mark as intentional exit
   if (myDbRef){
-    // Notify others before removing
     const leavingName = myPlayer ? myPlayer.name : 'Someone';
-    // Push leave message
     if(selectedRoomId && myPlayer){
       push(ref(db,'chat/'+selectedRoomId), {
         uid:'system', name:'SYSTEM', color:'#ff6b6b',
@@ -867,10 +903,14 @@ window.doSignOut = async () => {
   if(_roomUnsub){ _roomUnsub(); _roomUnsub=null; }
   if(_knockUnsub){ _knockUnsub(); _knockUnsub=null; }
   isWorldRunning = false;
+  _isExiting = false; // reset for next session
   myPlayer = null;
   players = {};
   chatBubbles = [];
   previousHost = undefined;
+  _prevRoomPlayers.clear();
+  _leavingUIDs.clear();
+  _firstPlayersFire = true; // next session ke liye reset
   // Go back to profile (still logged in)
   g('world').style.display = 'none';
   if(auth.currentUser){
@@ -892,7 +932,14 @@ onAuthStateChanged(auth, user => {
 const WC  = g('wc'),  ctx  = WC.getContext('2d');
 const MMC = g('mmc'), mCtx = MMC.getContext('2d');
 const TX=56, TY=28, WW=26, WH=22;
-
+const ROOM_THEMES = {
+  cyberpunk: { name:'CYBERPUNK', color:'#00f5ff', accent:'#cc44ff', bg:'#0d0030', floor:'#00f5ff', particle:'#cc44ff' },
+  void:      { name:'VOID',      color:'#9955ff', accent:'#4400aa', bg:'#05000f', floor:'#6633cc', particle:'#aa44ff' },
+  inferno:   { name:'INFERNO',   color:'#ff4400', accent:'#ff8800', bg:'#1a0500', floor:'#ff3300', particle:'#ffaa00' },
+  deepsea:   { name:'DEEP SEA',  color:'#0088ff', accent:'#00ffcc', bg:'#000d1a', floor:'#0066cc', particle:'#00ccff' },
+  matrix:    { name:'MATRIX',    color:'#39ff14', accent:'#00aa00', bg:'#000d00', floor:'#00cc00', particle:'#88ff44' },
+  neon:      { name:'NEON STORM',color:'#ffff00', accent:'#ffffff', bg:'#0a0a00', floor:'#cccc00', particle:'#ffffff' },
+};
 const ZONE_MUSIC = { music:'', club:'' };
 
 const ZONES = [
@@ -932,9 +979,13 @@ let roomList=[], roomsById={}, selectedRoomId=null, selectedRoom=null;
 let currentZoneId='', musicPanelOpen=false, musicIsPlaying=false;
 let particles=[], chatBubbles=[], rainDrops=[], clickTarget=null, keys={}, footsteps=[];
 let myUID=null, myDbRef=null, chatLogRef=null, isWorldRunning=false;
+let _isExiting = false; // exit flag
 let _roomUnsub=null, _knockUnsub=null;
 let hostNotifs=[], pendingKnocks={};
 let previousHost = undefined;
+const _leavingUIDs = new Set();
+const _prevRoomPlayers = new Map();
+let _firstPlayersFire = true; // pehli baar skip karo // uid -> name, persistent across listener calls // track intentional exits
 let zoneLimits = {}; // { zoneId: maxPlayers }
 
 // ─── ROOMS ───────────────────────────────────────────────────────────────────
@@ -1007,49 +1058,72 @@ function getRoomPlayerCount(roomId){
   return Object.values(players).filter(p => p.roomId === roomId).length;
 }
 
+const THEME_ICONS = {cyberpunk:'🌆',void:'🌌',inferno:'🔥',deepsea:'🌊',matrix:'🌿',neon:'⚡'};
+
 function renderRoomList(){
   const el = g('room-list');
   if(!el) return;
-  const pub  = roomList.filter(r => r.type !== 'private').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  const priv = roomList.filter(r => r.type === 'private').sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  let html = '';
+  const searchVal = (g('room-search-input')?.value||'').toLowerCase();
+  const pub  = roomList.filter(r=>r.type!=='private'&&(!searchVal||r.name.toLowerCase().includes(searchVal))).sort((a,b)=>(b.online||0)-(a.online||0));
+  const priv = roomList.filter(r=>r.type==='private'&&(!searchVal||r.name.toLowerCase().includes(searchVal))).sort((a,b)=>(b.online||0)-(a.online||0));
 
-  html += '<div class="room-section-label" style="color:#00f5ff;border-color:rgba(0,245,255,.2)">🌐 PUBLIC ROOMS <span style="opacity:.4;font-size:7px">'+pub.length+'</span></div>';
-  if(pub.length === 0) html += '<div style="color:#334;font-size:9px;padding:4px 4px 8px">No public rooms yet</div>';
-  else pub.forEach(r => {
-    const sel = r.id === selectedRoomId;
-    const isOwner = auth.currentUser && r.owner === auth.currentUser.uid;
-    const cnt = r.online||0;
-    html += `<div class="room-card${sel?' selected':''}" data-rid="${r.id}">
-      <div style="flex:1"><div class="rc-name">${escHtml(r.name)}${isOwner?' <span style="opacity:.4;font-size:8px">(you)</span>':''}</div>
-      <div class="rc-meta">${cnt} online</div></div>
-      <div class="rc-badge pub">PUBLIC</div>
-      ${isOwner ? `<button onclick="event.stopPropagation();deleteRoom('${r.id}')" style="background:rgba(255,60,60,.1);border:1px solid #ff4444;color:#ff6b6b;padding:2px 7px;border-radius:5px;cursor:pointer;font-size:8px;letter-spacing:1px;font-family:'Courier New',monospace;margin-left:6px">🗑</button>` : ''}
-      </div>`;
-  });
-
-  html += '<div class="room-section-label" style="color:#ffaa00;border-color:rgba(255,170,0,.2);margin-top:8px">🔒 PRIVATE ROOMS <span style="opacity:.4;font-size:7px">'+priv.length+'</span></div>';
-  if(priv.length === 0) html += '<div style="color:#334;font-size:9px;padding:4px 4px 8px">No private rooms yet</div>';
-  else priv.forEach(r => {
+  function makeCard(r){
     const sel = r.id === selectedRoomId;
     const isOwner = auth.currentUser && r.owner === auth.currentUser.uid;
     const locked = isRoomLocked(r);
-    const cnt = r.online||0;
-    const maxTxt = r.maxUsers > 0 ? ` / ${r.maxUsers}` : '';
-    html += `<div class="room-card priv-card${sel?' selected':''}${locked?' locked-card':''}" data-rid="${r.id}">
-      <div style="flex:1"><div class="rc-name priv-name">${locked?'🔒 ':''}${escHtml(r.name)}${isOwner?' <span style="opacity:.4;font-size:8px">(you)</span>':''}</div>
-      <div class="rc-meta">${cnt}${maxTxt} online${isOwner?' · key: '+escHtml(r.key||''):''}${locked?' · FULL':''}</div></div>
-      ${locked ? '<div class="rc-badge locked">FULL</div>' : '<div class="rc-badge priv">🔒 PRIV</div>'}
-      ${isOwner ? `<button onclick="event.stopPropagation();deleteRoom('${r.id}')" style="background:rgba(255,60,60,.1);border:1px solid #ff4444;color:#ff6b6b;padding:2px 7px;border-radius:5px;cursor:pointer;font-size:8px;letter-spacing:1px;font-family:'Courier New',monospace;margin-left:6px">🗑</button>` : ''}
-      </div>`;
-  });
+    const theme = ROOM_THEMES[r.theme||'cyberpunk'] || ROOM_THEMES.cyberpunk;
+    const icon = THEME_ICONS[r.theme||'cyberpunk']||'🌆';
+    const cnt = getRoomPlayerCount(r.id)||r.online||0;
+    const maxTxt = r.maxUsers>0?`/${r.maxUsers}`:'';
+    const selBorder = sel?`2px solid ${theme.color}`:'1px solid rgba(255,255,255,.08)';
+    const selGlow = sel?`0 0 20px ${theme.color}33`:'none';
+    return `<div class="room-card-v2" data-rid="${r.id}" 
+      style="border:${selBorder};box-shadow:${selGlow}">
+      ${isOwner?`<button class="rc2-delete" onclick="event.stopPropagation();deleteRoom('${r.id}')">🗑</button>`:''}
+      ${isOwner?`<div class="rc2-owner-badge">YOURS</div>`:''}
+      <div class="rc2-banner" style="background:linear-gradient(135deg,${theme.bg},${theme.color}22)">
+        <svg class="rc2-banner-grid" viewBox="0 0 100 80" preserveAspectRatio="none">
+          ${Array.from({length:6},(_,i)=>`<line x1="${i*20}" y1="0" x2="${i*20}" y2="80" stroke="${theme.color}" stroke-width="0.5" opacity="0.4"/>`).join('')}
+          ${Array.from({length:5},(_,i)=>`<line x1="0" y1="${i*20}" x2="100" y2="${i*20}" stroke="${theme.color}" stroke-width="0.5" opacity="0.4"/>`).join('')}
+        </svg>
+        <div class="rc2-theme-icon" style="color:${theme.color};text-shadow:0 0 20px ${theme.color}">${icon}</div>
+      </div>
+      <div class="rc2-body">
+        <div class="rc2-name" style="color:${theme.color}">${locked?'🔒 ':''}${escHtml(r.name)}</div>
+        <div class="rc2-meta-row">
+          <div class="rc2-online" style="color:${theme.color}99">
+            <div class="rc2-dot" style="background:${cnt>0?'#00ff88':'#334'}"></div>
+            ${cnt}${maxTxt} online
+          </div>
+          <div class="rc2-badges">
+            ${r.type==='private'
+              ?`<div class="rc2-badge" style="background:rgba(255,170,0,.15);color:#ffaa00;border:1px solid rgba(255,170,0,.3)">🔒 PRIV</div>`
+              :`<div class="rc2-badge" style="background:${theme.color}18;color:${theme.color};border:1px solid ${theme.color}33">${theme.name}</div>`}
+          </div>
+        </div>
+      </div>
+      ${locked?'<div class="rc2-full-bar">FULL</div>':''}
+    </div>`;
+  }
 
-
+  let html = '';
+  // Search bar
+  html += `<input class="room-search" id="room-search-input" placeholder="🔍 search rooms..." value="${escHtml(searchVal)}" oninput="renderRoomList()">`;
+  // Public
+  html += `<div class="room-section-v2">
+    <div class="rsv2-label" style="color:#00f5ff88">🌐 PUBLIC <span style="opacity:.4">${pub.length}</span></div>
+    ${pub.length===0?'<div style="color:#334;font-size:9px;padding:4px;letter-spacing:2px">No public rooms</div>':`<div class="room-grid">${pub.map(makeCard).join('')}</div>`}
+  </div>`;
+  // Private
+  html += `<div class="room-section-v2">
+    <div class="rsv2-label" style="color:#ffaa0088">🔒 PRIVATE <span style="opacity:.4">${priv.length}</span></div>
+    ${priv.length===0?'<div style="color:#334;font-size:9px;padding:4px;letter-spacing:2px">No private rooms</div>':`<div class="room-grid">${priv.map(makeCard).join('')}</div>`}
+  </div>`;
 
   el.innerHTML = html;
   g('room-count').textContent = pub.length+' public · '+priv.length+' private';
-  el.querySelectorAll('.room-card[data-rid]').forEach(card => {
-    card.addEventListener('click', () => selectRoom(card.dataset.rid));
+  el.querySelectorAll('.room-card-v2[data-rid]').forEach(card=>{
+    card.addEventListener('click',()=>selectRoom(card.dataset.rid));
   });
 }
 
@@ -1079,10 +1153,10 @@ async function selectRoom(id){
     return;
   }
 
-  if(room.maxUsers > 0 && onlineCount >= room.maxUsers && room.type !== 'private'){
-    g('profile-err').textContent = 'ROOM IS FULL (max '+room.maxUsers+')';
-    return;
-  }
+  // if(room.maxUsers > 0 && onlineCount >= room.maxUsers && room.type !== 'private'){
+  //   g('profile-err').textContent = 'ROOM IS FULL (max '+room.maxUsers+')';
+  //   return;
+  // }
 
   selectedRoomId = id; selectedRoom = room;
   localStorage.setItem('nexus_roomId', id);
@@ -1116,11 +1190,12 @@ window.createRoom = async function(){
   if(!auth.currentUser){ g('profile-err').textContent='NOT LOGGED IN'; return; }
   try {
     const nr = push(ref(db,'rooms'));
+    const theme = g('new-room-theme').value || 'cyberpunk';
     await set(nr, {
       name, type, key: type==='private' ? key : '',
       owner: auth.currentUser.uid, host: auth.currentUser.uid,
       maxUsers: type==='private' ? 10 : 0,
-      online: 0, created: Date.now()
+      theme, online: 0, created: Date.now()
     });
     selectedRoomId = nr.key;
     selectedRoom = { id:nr.key, name, type, key, owner:auth.currentUser.uid, host:auth.currentUser.uid, maxUsers:type==='private'?10:0 };
@@ -1212,6 +1287,7 @@ window.enterNexus = async function(){
     g('profile-enter-btn').disabled = false;
     return; 
   }
+  // 🔒 Check room key for private rooms
   if(room.type==='private' && room.owner!==auth.currentUser.uid){
     const k=g('room-key-input').value.trim();
     if(k!==room.key){ 
@@ -1220,6 +1296,19 @@ window.enterNexus = async function(){
       return; 
     }
   }
+
+  // ✅ NEW: CHECK IF ROOM IS FULL (maxUsers)
+  // const playersSnap = await get(ref(db, 'players'));
+  // let onlineCount = 0;
+  // playersSnap.forEach(p => {
+  //   if(p.val().roomId === selectedRoomId) onlineCount++;
+  // });
+  // if (room.maxUsers > 0 && onlineCount >= room.maxUsers) {
+  //   g('profile-err').textContent = 'ROOM IS FULL (max ' + room.maxUsers + ')';
+  //   g('profile-enter-btn').disabled = false;
+  //   return;
+  // }
+
   g('profile-enter-btn').disabled = true;
   try {
     await updateProfile(auth.currentUser,{displayName:name}).catch(()=>{});
@@ -1261,8 +1350,31 @@ async function launchWorld(user){
 
   g('loading-screen').style.display='none';
   g('world').style.display='block';
-  g('tb-user').textContent = name.toUpperCase();
+
+  // Small delay to ensure DOM is visible before styling
+  await new Promise(r => setTimeout(r, 50));
+
+  // Apply room theme to world
+  const rTheme = ROOM_THEMES[room.theme||'cyberpunk']||ROOM_THEMES.cyberpunk;
+  document.documentElement.style.setProperty('--room-color', rTheme.color);
+  document.documentElement.style.setProperty('--room-accent', rTheme.accent);
+  // Top bar tint
+  g('top-bar').style.borderBottomColor = rTheme.color+'33';
+  // Set content PEHLE, style BAAD MEIN
   g('tb-room').textContent = (room.name||'NEXUS').toUpperCase();
+  g('tb-user').textContent = name.toUpperCase();
+  // Safe style application
+  const tbRoom = g('tb-room');
+  const tbLogo = g('tb-logo');
+  if(tbRoom){
+    tbRoom.style.borderColor = rTheme.color+'44';
+    tbRoom.style.color = rTheme.color;
+    tbRoom.style.background = rTheme.color+'14';
+  }
+  if(tbLogo){
+    tbLogo.style.color = rTheme.color;
+    tbLogo.style.textShadow = `0 0 10px ${rTheme.color}50`;
+  }
   g('sb-room-label').textContent = (room.name||'NEXUS').toUpperCase();
  previousHost = undefined;
   myUID = user.uid;
@@ -1289,15 +1401,14 @@ async function launchWorld(user){
   });
   onDisconnect(myDbRef).remove();
 
-  // ── Players listener ──
+// ── Players listener ──
   onValue(ref(db,'players'), snap => {
     const data = snap.val() || {};
-    const oldRoomMap = new Map();
-    Object.values(players).forEach(p => { if(p.id && p.roomId) oldRoomMap.set(p.id, p.roomId); });
 
     const newSet = {};
     Object.entries(data).forEach(([uid, p]) => {
       if(uid === myUID){ newSet[uid] = players[uid] || myPlayer; return; }
+      if(p.roomId !== selectedRoomId) return; // sirf same room ke players
       const ex = players[uid];
       newSet[uid] = {
         id:uid, name:p.name||'Ghost', av:p.av||0, vibe:p.vibe||'chill',
@@ -1312,43 +1423,32 @@ async function launchWorld(user){
       };
     });
     Object.keys(players).forEach(uid => { if(!newSet[uid]) delete players[uid]; });
-    // Remove stale players (no update for 15 seconds)
-const now = Date.now();
-for (let [uid, p] of Object.entries(newSet)) {
-  if (uid === myUID) continue; // don't remove yourself
-  // Firebase serverTimestamp is in milliseconds
-  const lastUpdate = p.ts ? (typeof p.ts === 'number' ? p.ts : 0) : 0;
-  if (lastUpdate && (now - lastUpdate) > 15000) {
-    delete newSet[uid];
-    console.log(`Removed stale player: ${p.name}`);
-  }
-}
     Object.assign(players, newSet);
 
     // ── Host join/leave notifications ──
-    if(isHostNow()){
-      // Check for new joins
+    if(!_firstPlayersFire && isHostNow() && isWorldRunning){
       for(let [uid, p] of Object.entries(newSet)){
         if(uid === myUID) continue;
-        const wasInRoom = oldRoomMap.get(uid) === selectedRoomId;
-        const isInRoom = p.roomId === selectedRoomId;
-        if(!wasInRoom && isInRoom){
+        if(!_prevRoomPlayers.has(uid)){
           addHostNotif(`🟢 ${p.name} entered the room`);
           toast(`🟢 ${p.name} joined!`, '#00ff88');
         }
-        if(wasInRoom && !isInRoom){
-          addHostNotif(`🔴 ${p.name} left the room`);
-          toast(`🔴 ${p.name} left`, '#ff6b6b');
-        }
       }
-      // Check for disconnects
-      for(let [uid, oldRoom] of oldRoomMap.entries()){
-        if(oldRoom === selectedRoomId && !newSet[uid]){
-          addHostNotif('🔌 A user disconnected');
-          toast('🔌 A user disconnected', '#ff6b6b');
+      for(let [uid, pname] of _prevRoomPlayers.entries()){
+        if(uid === myUID) continue;
+        if(!newSet[uid] && !_leavingUIDs.has(uid)){
+          addHostNotif(`🔴 ${pname} left the room`);
+          toast(`🔴 ${pname} left`, '#ff6b6b');
         }
       }
     }
+    _firstPlayersFire = false; // ab se normal tracking
+
+    // _prevRoomPlayers update karo AFTER comparison
+    _prevRoomPlayers.clear();
+    Object.entries(newSet).forEach(([uid, p]) => {
+      if(uid !== myUID) _prevRoomPlayers.set(uid, p.name || 'Someone');
+    });
 
     // ✅ Update room locked status in real-time
     renderRoomList();
@@ -1361,15 +1461,32 @@ for (let [uid, p] of Object.entries(newSet)) {
   chatLogRef = ref(db,'chat/'+selectedRoomId);
   const chatQ = query(chatLogRef, orderByChild('ts'), limitToLast(50));
   let _seenMsgIds = new Set();
+  const boothZone = ZONES.find(z => z.id === 'booth');
+  function isPlayerInBooth(player){
+    if(!player || !boothZone) return false;
+    const px = Math.round(player.tx !== undefined ? player.tx : player.lx);
+    const py = Math.round(player.ty !== undefined ? player.ty : player.ly);
+    return px >= boothZone.x && px < boothZone.x + boothZone.w &&
+           py >= boothZone.y && py < boothZone.y + boothZone.h;
+  }
+
   onValue(chatQ, snap => {
     const msgs=[];
     snap.forEach(c => { const m={id:c.key,...c.val()}; msgs.push(m); });
-    renderChatLog(msgs);
-    if(msgs.length>0){
-      const last=msgs[msgs.length-1];
+
+    // Filter: agar msg boothOnly hai to sirf booth wale dekh sakte hain
+    const myAmInBooth = myPlayer && isPlayerInBooth(myPlayer);
+    const filteredMsgs = msgs.filter(m => {
+      if(!m.boothOnly) return true; // normal msg — sab dekh sakte hain
+      return myAmInBooth; // boothOnly — sirf booth wale dekh sakte hain
+    });
+
+    renderChatLog(filteredMsgs);
+    if(filteredMsgs.length>0){
+      const last=filteredMsgs[filteredMsgs.length-1];
       const p=Object.values(players).find(pl=>pl.id===last.uid);
       if(p && last.ts && Date.now()-last.ts<4000) addBubble(p,last.msg);
-      msgs.forEach(m => {
+      filteredMsgs.forEach(m => {
         if(_seenMsgIds.has(m.id)) return;
         _seenMsgIds.add(m.id);
         if(m.uid!==myUID && myPlayer && m.msg){
@@ -1392,7 +1509,16 @@ for (let [uid, p] of Object.entries(newSet)) {
     zoneLimits = snap.val() || {};
   });
 
-  buildZoneNav(); buildEQ(); resize();
+  buildZoneNav(); buildEQ();
+  // Force resize before first frame
+  WC.width = W = window.innerWidth;
+  WC.height = H = window.innerHeight;
+  MMC.width = 150; MMC.height = 100;
+  resize();
+  window.addEventListener('resize', () => {
+    WC.width = W = window.innerWidth;
+    WC.height = H = window.innerHeight;
+  });
   toast('WELCOME TO NEXUS, '+name.toUpperCase()+'!','#00f5ff');
   // Keep checking host UI until it confirms (room data may load late)
   let _hostCheckCount = 0;
@@ -1485,11 +1611,11 @@ function isHostNow(){
   if(!selectedRoomId || !auth.currentUser) return false;
   const room = roomsById[selectedRoomId] || selectedRoom;
   if(!room) return false;
-  // Check both host and owner fields
   const host = room.host;
   const owner = room.owner;
   const uid = auth.currentUser.uid;
-  return host === uid || (!host && owner === uid);
+  // host match karo, ya owner match karo (host field na ho ya empty ho)
+  return host === uid || owner === uid;
 }
 
 function updateHostUI(){
@@ -1613,7 +1739,9 @@ async function refreshMemberList(){
     });
   });
 }
-
+// g('dbg-btn').onclick = () => {
+//   console.log('ROOM:',selectedRoomId,'ROOMDATA:',roomsById[selectedRoomId],'HOST:',isHostNow(),'UID:',auth?.currentUser?.uid);
+// };
 g('update-room-limit').onclick = async () => {
   const v = parseInt(g('room-max-users').value);
   if(isNaN(v)) return;
@@ -1639,7 +1767,7 @@ window.setZoneLimit = async function(zoneId, limit){
 // ─── position push ────────────────────────────────────────────────────────────
 let lastPush=0;
 function pushPos(){
-  if(!myUID||!myDbRef) return;
+  if(!myUID||!myDbRef||_isExiting) return;
   const now=Date.now(); if(now-lastPush<80) return; lastPush=now;
   const z=zoneAt(Math.round(myPlayer.lx),Math.round(myPlayer.ly));
 set(myDbRef,{
@@ -1664,14 +1792,17 @@ window.sendMsg = function(){
   if(!msg||!myPlayer) return;
   const roomId=myPlayer.roomId||selectedRoomId;
   const isEveryone = msg.toLowerCase().startsWith('@everyone');
+  const myZone = zoneAt(Math.round(myPlayer.lx), Math.round(myPlayer.ly));
+  const isInPrivateBooth = myZone && myZone.id === 'booth';
   push(ref(db,'chat/'+roomId),{
     uid:myUID, name:myPlayer.name, msg,
     color:myPlayer.color,
     priv:msg.startsWith('@') && !isEveryone,
     everyone:isEveryone,
+    boothOnly: isInPrivateBooth ? true : false,
     ts:serverTimestamp()
   }).catch(()=>{});
-  addBubble(myPlayer,msg);
+  addBubble(myPlayer, msg, isInPrivateBooth);
   burst(myPlayer.sx,myPlayer.sy-40,myPlayer.color,10);
   inp.value=''; hideMentionSuggestions();
 };
@@ -1826,8 +1957,10 @@ g('wc').addEventListener('click',e=>{
     const myCurrentZone = zoneAt(Math.round(myPlayer.lx), Math.round(myPlayer.ly));
     // Only block if clicking into a DIFFERENT zone that is full
     if(targetZone && (!myCurrentZone || myCurrentZone.id !== targetZone.id)){
-      if(!canEnterZone(targetZone.id)){
-        toast('⛔ '+targetZone.name+' IS FULL ('+getZonePlayerCount(targetZone.id)+'/'+zoneLimits[targetZone.id]+')', '#ff4444');
+      const limit = zoneLimits[targetZone.id];
+      const cnt = getZonePlayerCount(targetZone.id);
+      if(limit && limit > 0 && cnt >= limit && !isHostNow()){
+        toast('⛔ '+targetZone.name+' IS FULL ('+cnt+'/'+limit+')', '#ff4444');
         return;
       }
     }
@@ -1896,7 +2029,8 @@ function getZonePlayerCount(zoneId){
   if(!zone) return 0;
   return Object.values(players).filter(p => {
     if(p.roomId !== selectedRoomId) return false;
-    const px = Math.round(p.lx||p.tx), py = Math.round(p.ly||p.ty);
+    const px = Math.round(p.tx !== undefined ? p.tx : p.lx);
+    const py = Math.round(p.ty !== undefined ? p.ty : p.ly);
     return px>=zone.x && px<zone.x+zone.w && py>=zone.y && py<zone.y+zone.h;
   }).length;
 }
@@ -1904,14 +2038,12 @@ function getZonePlayerCount(zoneId){
 function isZoneFull(zoneId){
   const limit = zoneLimits[zoneId];
   if(!limit || limit <= 0) return false;
-  // Count only players who are actually IN this zone (not just moving toward it)
   const zone = ZONES.find(z => z.id === zoneId);
   if(!zone) return false;
   const count = Object.values(players).filter(p => {
     if(p.roomId !== selectedRoomId) return false;
-    // Use lx/ly (actual rendered position) not tx/ty (target position)
-    const px = p.lx !== undefined ? p.lx : p.tx;
-    const py = p.ly !== undefined ? p.ly : p.ty;
+    const px = Math.round(p.tx !== undefined ? p.tx : p.lx);
+    const py = Math.round(p.ty !== undefined ? p.ty : p.ly);
     return px >= zone.x && px < zone.x + zone.w && py >= zone.y && py < zone.y + zone.h;
   }).length;
   return count >= limit;
@@ -1919,13 +2051,11 @@ function isZoneFull(zoneId){
 
 function canEnterZone(zoneId){
   if(!zoneId || !myPlayer) return true;
-  // Host can always enter any zone
   if(isHostNow()) return true;
   if(isZoneFull(zoneId)){
-    // Check if I am already in this zone (use both tx/ty and lx/ly)
-    const myZoneTx = zoneAt(Math.round(myPlayer.tx), Math.round(myPlayer.ty));
+    // Only check lx/ly (actual rendered position) — tx/ty may already be set to target
     const myZoneLx = zoneAt(Math.round(myPlayer.lx), Math.round(myPlayer.ly));
-    if((myZoneTx && myZoneTx.id === zoneId) || (myZoneLx && myZoneLx.id === zoneId)){
+    if(myZoneLx && myZoneLx.id === zoneId){
       return true; // already inside, can stay
     }
     return false;
@@ -1967,16 +2097,17 @@ function renderChatLog(msgs){
   log.scrollTop=log.scrollHeight;
 }
 
-function addBubble(player, msg) {
+function addBubble(player, msg, boothOnly=false) {
   chatBubbles = chatBubbles.filter(b => b.pid !== player.id);
   const bubble = {
     pid: player.id,
     msg,
     life: 1,
-    maxT: 5,   // 5 seconds
+    maxT: 5,
     color: player.color,
     priv: msg.startsWith('@') && !msg.startsWith('@everyone'),
-    everyone: msg.startsWith('@everyone')
+    everyone: msg.startsWith('@everyone'),
+    boothOnly: boothOnly
   };
   chatBubbles.push(bubble);
   // Force remove after 5 seconds (redundant with life timer, but safe)
@@ -1986,20 +2117,34 @@ function addBubble(player, msg) {
 }
 
 function buildZoneNav(){
-  const nav=g('zone-nav'); nav.innerHTML='';
-  ZONES.forEach(z=>{
-    const chip=document.createElement('div'); chip.className='zchip'; chip.dataset.zone=z.id;
-    chip.style.setProperty('--zc',z.color);
+  const nav = g('zone-nav');
+  nav.innerHTML = '';
+  ZONES.forEach(z => {
+    const chip = document.createElement('div');
+    chip.className = 'zchip';
+    chip.dataset.zone = z.id;
+    chip.style.setProperty('--zc', z.color);
     const cnt = getZonePlayerCount(z.id);
     const limit = zoneLimits[z.id];
-    const full = limit && cnt >= limit;
-    chip.textContent = z.name + (limit ? ` (${cnt}/${limit})` : '');
-    if(full) chip.style.opacity = '0.5';
-    chip.addEventListener('click',()=>{ 
+    const isFull = limit && limit > 0 && cnt >= limit;
+    let displayName = z.name;
+    if(limit && limit > 0) displayName += ` (${cnt}/${limit})`;
+    if(isFull) displayName = `🔒 ${displayName}`;
+    chip.textContent = displayName;
+    if(isFull) chip.style.opacity = '0.5';
+    chip.addEventListener('click', () => {
       if(!myPlayer) return;
-      if(full && !canEnterZone(z.id)){ toast('⛔ '+z.name+' IS FULL ('+cnt+'/'+limit+')', '#ff4444'); return; }
-      myPlayer.tx=z.x+Math.floor(z.w/2); myPlayer.ty=z.y+Math.floor(z.h/2); 
-      toast('TELEPORT → '+z.name,z.color); 
+      // Runtime pe fresh check karo — build time ki isFull stale hoti hai
+      const liveCnt = getZonePlayerCount(z.id);
+      const liveLimit = zoneLimits[z.id];
+      const liveFull = !!(liveLimit && liveLimit > 0 && liveCnt >= liveLimit);
+      if(liveFull && !canEnterZone(z.id)){
+        toast(`⛔ ${z.name} IS FULL (${liveCnt}/${liveLimit})`, '#ff4444');
+        return;
+      }
+      myPlayer.tx = z.x + Math.floor(z.w/2);
+      myPlayer.ty = z.y + Math.floor(z.h/2);
+      toast('TELEPORT → '+z.name, z.color);
     });
     nav.appendChild(chip);
   });
@@ -2027,24 +2172,37 @@ function update(dt){
   if(!myPlayer) return;
   const sp=.07;
   const movePressed=keys['ArrowUp']||keys['w']||keys['W']||keys['ArrowDown']||keys['s']||keys['S']||keys['ArrowLeft']||keys['a']||keys['A']||keys['ArrowRight']||keys['d']||keys['D'];
-  if(myPlayer.state==='sitting'){ if(movePressed){ myPlayer.state='idle'; myPlayer.emote=null; } }
-  else {
-    // Save old position before moving
-    const oldTx = myPlayer.tx, oldTy = myPlayer.ty;
-    if(keys['ArrowUp']  ||keys['w']||keys['W']) myPlayer.ty=Math.max(0,myPlayer.ty-sp);
-    if(keys['ArrowDown']||keys['s']||keys['S']) myPlayer.ty=Math.min(WH-1,myPlayer.ty+sp);
-    if(keys['ArrowLeft']||keys['a']||keys['A']) myPlayer.tx=Math.max(0,myPlayer.tx-sp);
-    if(keys['ArrowRight']||keys['d']||keys['D']) myPlayer.tx=Math.min(WW-1,myPlayer.tx+sp);
-    // Check if new position is in a full zone
-    const newZoneCheck = zoneAt(Math.round(myPlayer.tx), Math.round(myPlayer.ty));
-    const oldZoneCheck = zoneAt(Math.round(oldTx), Math.round(oldTy));
-    // Only block if moving INTO a different zone that is full
-    if(newZoneCheck && (!oldZoneCheck || oldZoneCheck.id !== newZoneCheck.id)){
-      if(!canEnterZone(newZoneCheck.id)){
-        myPlayer.tx = oldTx; myPlayer.ty = oldTy; // revert
-      }
+if(myPlayer.state === 'sitting'){
+  if(movePressed){ myPlayer.state='idle'; myPlayer.emote=null; }
+} else {
+  const oldTx = Math.round(myPlayer.lx !== undefined ? myPlayer.lx : myPlayer.tx);
+      const oldTy = Math.round(myPlayer.ly !== undefined ? myPlayer.ly : myPlayer.ty);
+      let newTx = myPlayer.tx;
+      let newTy = myPlayer.ty;
+  if(keys['ArrowUp']  || keys['w'] || keys['W']) newTy = Math.max(0, myPlayer.ty - sp);
+  if(keys['ArrowDown']|| keys['s'] || keys['S']) newTy = Math.min(WH-1, myPlayer.ty + sp);
+  if(keys['ArrowLeft']|| keys['a'] || keys['A']) newTx = Math.max(0, myPlayer.tx - sp);
+  if(keys['ArrowRight']|| keys['d'] || keys['D']) newTx = Math.min(WW-1, myPlayer.tx + sp);
+  
+  // Get old and new zone using SAVED old position
+  const oldZone = zoneAt(Math.round(oldTx), Math.round(oldTy));
+  const newZone = zoneAt(Math.round(newTx), Math.round(newTy));
+  // Only block if moving into a different zone that is full
+  if(newZone && (!oldZone || oldZone.id !== newZone.id)){
+    if(!canEnterZone(newZone.id)){
+      // toast only occasionally to avoid spam
+      if(Math.random() < 0.05) toast(`⛔ ${newZone.name} is full!`, '#ff4444');
+      // Do not update position
+    } else {
+      myPlayer.tx = newTx;
+      myPlayer.ty = newTy;
     }
+  } else {
+    myPlayer.tx = newTx;
+    myPlayer.ty = newTy;
   }
+}
+  
   Object.values(players).forEach(p=>{
     const dx=p.tx-p.lx, dy=p.ty-p.ly, dist=Math.sqrt(dx*dx+dy*dy), lspd=p.isMe?.14:.1;
     if(dist>.02){
@@ -2120,11 +2278,20 @@ function drawFloor(){
 function drawZoneBorders(){
   ZONES.forEach(z=>{
     const isActive=currentZoneId===z.id;
+     const cnt = getZonePlayerCount(z.id);
+    const limit = zoneLimits[z.id];
+    const isFull = limit && limit > 0 && cnt >= limit;
     const corners=[worldToScreen(z.x,z.y),worldToScreen(z.x+z.w,z.y),worldToScreen(z.x+z.w,z.y+z.h),worldToScreen(z.x,z.y+z.h)];
     ctx.save(); ctx.globalAlpha=(isActive?.35:.18)+.08*Math.sin(time*.6+z.x*.5); ctx.strokeStyle=z.color; ctx.lineWidth=isActive?2:1;
     ctx.setLineDash([5,10]); ctx.lineDashOffset=-time*8;
     ctx.beginPath(); corners.forEach((c,i)=>i===0?ctx.moveTo(c.x,c.y):ctx.lineTo(c.x,c.y)); ctx.closePath(); ctx.stroke(); ctx.setLineDash([]);
     const cp=worldToScreen(z.x+z.w*.5,z.y+z.h*.5);
+        ctx.globalAlpha = isActive ? 0.5 : 0.3;
+    ctx.fillStyle = z.color;
+    ctx.font = `bold ${isActive ? 10 : 9}px Courier New`;
+    ctx.textAlign = 'center';
+    let zoneText = isFull ? `🔒 ${z.name}` : z.name;
+    ctx.fillText(zoneText, cp.x, cp.y - 10);
     ctx.globalAlpha=isActive?.5:(.3+.1*Math.sin(time*.5+z.x)); ctx.fillStyle=z.color; ctx.font='bold '+(isActive?10:9)+'px Courier New'; ctx.textAlign='center'; ctx.fillText(z.name,cp.x,cp.y-10);
     ctx.globalAlpha=isActive?.06:(.025+.012*Math.sin(time*.4+z.x));
     const gr=ctx.createRadialGradient(cp.x,cp.y,0,cp.x,cp.y,140); gr.addColorStop(0,z.color+'88'); gr.addColorStop(1,'transparent'); ctx.fillStyle=gr; ctx.beginPath(); ctx.arc(cp.x,cp.y,140,0,Math.PI*2); ctx.fill();
@@ -2363,8 +2530,20 @@ function drawAvatar(p){
 }
 
 function drawBubbles(){
+  const boothZ = ZONES.find(z => z.id === 'booth');
+  const myInBooth = myPlayer && boothZ &&
+    Math.round(myPlayer.tx) >= boothZ.x && Math.round(myPlayer.tx) < boothZ.x + boothZ.w &&
+    Math.round(myPlayer.ty) >= boothZ.y && Math.round(myPlayer.ty) < boothZ.y + boothZ.h;
+
   chatBubbles.forEach(b=>{
     const p=Object.values(players).find(pl=>pl.id===b.pid); if(!p) return;
+    // Agar bubble boothOnly hai aur main booth mein nahi hoon to skip
+    if(b.boothOnly && !myInBooth) return;
+    // Agar sender booth mein hai aur main nahi hoon to skip
+    const senderInBooth = boothZ &&
+      Math.round(p.tx) >= boothZ.x && Math.round(p.tx) < boothZ.x + boothZ.w &&
+      Math.round(p.ty) >= boothZ.y && Math.round(p.ty) < boothZ.y + boothZ.h;
+    if(senderInBooth && !myInBooth) return;
     const bpx=p.sx, bpy=p.sy-72;
     if(bpx<-200||bpx>W+200) return;
     const fade=Math.min(1,b.life*3);
@@ -2420,6 +2599,12 @@ function drawMinimap(){
 let last=0;
 function loop(ts){
   const dt=Math.min((ts-last)/1000,.05); last=ts;
+  // Force canvas size every frame if needed
+  if(WC.width !== window.innerWidth || WC.height !== window.innerHeight){
+    WC.width = W = window.innerWidth;
+    WC.height = H = window.innerHeight;
+    MMC.width = 150; MMC.height = 100;
+  }
   resize(); update(dt);
   drawBg(); drawFloor(); drawZoneBorders(); drawFurniture(); drawFootsteps();
  const currentRoomPlayers = Object.values(players).filter(p => p.roomId === selectedRoomId);
